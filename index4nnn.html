@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>照片画廊</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #0f3460;
+      color: #fff;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .book-container {
+      position: relative;
+      width: 90%;
+      max-width: 900px;
+      height: 600px;
+      margin-top: 10px;
+      perspective: 1500px;
+    }
+    .book {
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      position: relative;
+    }
+    .page {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: #111;
+      backface-visibility: hidden;
+      transform-origin: left center;
+      transition: transform 1.2s ease-in-out;
+      box-shadow: 0 0 25px rgba(0,0,0,0.5);
+      border-radius: 8px;
+    }
+    .page-content {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+    }
+    .photo-container {
+      width: 90%;
+      height: 90%;
+      overflow: hidden;
+      position: relative;
+      border-radius: 8px;
+    }
+    .photo {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      transition: transform 0.3s ease;
+    }
+    .photo.zoomed {
+      transform: scale(1.8);
+      cursor: zoom-out;
+    }
+    .controls {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      z-index: 1000;
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #3498db, #8e44ad);
+      color: white;
+      cursor: pointer;
+      font-size: 1rem;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .scroll-gallery {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      width: 100%;
+    }
+    .scroll-gallery img {
+      width: 90%;
+      max-width: 900px;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1><i class="fas fa-book"></i> 照片画廊</h1>
+
+  <div class="book-container">
+    <div class="book" id="book"></div>
+  </div>
+
+  <div class="controls">
+    <button id="prev-btn">⬅ 上一页</button>
+    <button id="next-btn">下一页 ➡</button>
+    <button id="reset-btn">🏠 封面</button>
+    <button id="zoom-btn">🔍 放大</button>
+    <button id="mode-switch">📃 滚动模式</button>
+  </div>
+
+  <div class="scroll-gallery" id="scroll-gallery"></div>
+
+  <script>
+    const book = document.getElementById('book');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const zoomBtn = document.getElementById('zoom-btn');
+    const modeBtn = document.getElementById('mode-switch');
+    const scrollGallery = document.getElementById('scroll-gallery');
+
+    const totalImages = 42;
+    const imageFolder = 'flipbook images/';
+    const imageExtension = '.jpg';
+
+    let pages = [];
+    let currentPage = 0;
+    let zoomed = false;
+    let isScrollMode = false;
+
+    function createPages() {
+      for (let i = 0; i <= totalImages; i++) {
+        const page = document.createElement('div');
+        page.className = 'page';
+        page.style.transform = 'rotateY(180deg)';
+        const number = i.toString().padStart(2, '0');
+        const src = `${imageFolder}${number}${imageExtension}`;
+        page.innerHTML = `
+          <div class="page-content">
+            <div class="photo-container">
+              <img class="photo" src="${src}" />
+            </div>
+          </div>
+        `;
+        book.appendChild(page);
+        pages.push(page);
+      }
+      pages[0].style.transform = 'rotateY(0deg)';
+    }
+
+    function updateButtons() {
+      prevBtn.disabled = currentPage <= 0;
+      nextBtn.disabled = currentPage >= pages.length - 1;
+    }
+
+    function nextPage() {
+      if (currentPage < pages.length - 1) {
+        pages[currentPage].style.zIndex = pages.length - currentPage;
+        pages[currentPage].style.transform = 'rotateY(-180deg)';
+        currentPage++;
+        pages[currentPage].style.transform = 'rotateY(0deg)';
+        pages[currentPage].style.zIndex = pages.length;
+        zoomed = false;
+        updateButtons();
+      }
+    }
+
+    function prevPage() {
+      if (currentPage > 0) {
+        pages[currentPage].style.transform = 'rotateY(180deg)';
+        currentPage--;
+        pages[currentPage].style.transform = 'rotateY(0deg)';
+        zoomed = false;
+        updateButtons();
+      }
+    }
+
+    function resetBook() {
+      pages.forEach((p, i) => {
+        p.style.transform = i === 0 ? 'rotateY(0deg)' : 'rotateY(180deg)';
+        p.style.zIndex = pages.length - i;
+      });
+      currentPage = 0;
+      zoomed = false;
+      updateButtons();
+    }
+
+    function toggleZoom() {
+      const currentPhoto = pages[currentPage].querySelector('.photo');
+      if (!currentPhoto) return;
+      zoomed = !zoomed;
+      currentPhoto.classList.toggle('zoomed', zoomed);
+      zoomBtn.textContent = zoomed ? '🔎 缩小' : '🔍 放大';
+      pages[currentPage].querySelector('.photo-container').style.overflow = zoomed ? 'auto' : 'hidden';
+    }
+
+    function toggleScrollMode() {
+      isScrollMode = !isScrollMode;
+      document.body.style.overflow = isScrollMode ? 'auto' : 'hidden';
+      book.style.display = isScrollMode ? 'none' : 'block';
+      scrollGallery.style.display = isScrollMode ? 'flex' : 'none';
+      modeBtn.textContent = isScrollMode ? '📖 翻页模式' : '📃 滚动模式';
+      if (isScrollMode && scrollGallery.children.length === 0) {
+        for (let i = 1; i <= totalImages; i++) {
+          const img = document.createElement('img');
+          const number = i.toString().padStart(2, '0');
+          img.src = `${imageFolder}${number}${imageExtension}`;
+          scrollGallery.appendChild(img);
+        }
+      }
+    }
+
+    prevBtn.onclick = prevPage;
+    nextBtn.onclick = nextPage;
+    resetBtn.onclick = resetBook;
+    zoomBtn.onclick = toggleZoom;
+    modeBtn.onclick = toggleScrollMode;
+
+    createPages();
+    updateButtons();
+  </script>
+</body>
+</html>
